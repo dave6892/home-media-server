@@ -1,0 +1,4 @@
+# Copy this file to nfs.properties and update with your actual values
+# nfs.properties is gitignored to keep environment-specific config out of version control
+server=YOUR_NFS_SERVER_IP
+path=YOUR_MOUNTED_NFS_PATH

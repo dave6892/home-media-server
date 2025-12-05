@@ -5,3 +5,45 @@ kind: Kustomization
 # No patches needed - microk8s-hostpath is already the default in base
 resources:
   - ../../base
+
+configMapGenerator:
+  - name: nfs-config
+    envs:
+      - nfs.properties
+
+patches:
+  # PersistentVolumes
+  - target:
+      kind: PersistentVolume
+      name: plex-media-pv
+    patch: |-
+      - op: remove
+        path: /spec/hostPath
+      - op: add
+        path: /spec/nfs
+        value:
+          server: PLACEHOLDER  # Will be replaced
+          path: PLACEHOLDER
+
+# Replace the placeholder with the actual value from ConfigMap
+replacements:
+  - source:
+      kind: ConfigMap
+      name: nfs-config
+      fieldPath: data.server
+    targets:
+      - select:
+          kind: PersistentVolume
+          name: plex-media-pv
+        fieldPaths:
+          - spec.nfs.server
+  - source:
+      kind: ConfigMap
+      name: nfs-config
+      fieldPath: data.path
+    targets:
+      - select:
+          kind: PersistentVolume
+          name: plex-media-pv
+        fieldPaths:
+          - spec.nfs.path
