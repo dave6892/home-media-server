@@ -141,8 +141,6 @@ spec:
         env:
         - name: TZ
           value: "UTC"
-        - name: PLEX_CLAIM
-          value: "claim-mxfsmv7oUzr15PdMy5Sx"  # Add your claim token from https://www.plex.tv/claim/
         - name: ADVERTISE_IP
           value: ""  # Add your server IP if needed
         - name: PLEX_UID
