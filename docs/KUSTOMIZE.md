@@ -8,12 +8,18 @@ This project uses Kustomize to manage environment-specific configurations for di
 app/
 ├── base/
 │   ├── kustomization.yaml    # Base kustomization config
-│   └── deployment.yaml        # Base deployment manifests
+│   ├── namespace.yaml        # Namespace definition
+│   ├── storage.yaml          # Shared PersistentVolumes
+│   ├── plex.yaml             # Plex service manifests
+│   ├── tautulli.yaml         # Tautulli service manifests
+│   └── overseerr.yaml        # Overseerr service manifests
 └── overlays/
     ├── minikube/
     │   └── kustomization.yaml # Minikube-specific patches (StorageClass: standard)
     └── microk8s/
-        └── kustomization.yaml # MicroK8s-specific patches (StorageClass: microk8s-hostpath)
+        ├── kustomization.yaml # MicroK8s-specific patches (StorageClass: microk8s-hostpath)
+        ├── nfs.properties     # Environment-specific NFS config (not in version control)
+        └── nfs.properties.example  # Template for NFS configuration
 ```
 
 ## How Kustomize Works
@@ -54,7 +60,8 @@ kubectl apply -k app/overlays/microk8s
 - Updates hostPath from `/var/snap/microk8s/...` → `/tmp/hostpath-provisioner/...`
 
 ### MicroK8s Overlay
-- Uses base configuration as-is (no patches needed)
+- Converts `plex-media-pv` from hostPath to NFS using values from `nfs.properties`
+- Injects NFS server IP and path at build time via Kustomize replacements
 
 ## Key Kustomize Concepts
 

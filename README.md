@@ -15,8 +15,12 @@ This project uses Kustomize to manage configurations across different Kubernetes
 ```
 app/
 ├── base/                    # Base Kubernetes manifests
-│   ├── deployment.yaml     # All service definitions
-│   └── kustomization.yaml  # Base kustomize config
+│   ├── kustomization.yaml  # Base kustomize config
+│   ├── namespace.yaml      # Namespace definition
+│   ├── storage.yaml        # Shared storage (PersistentVolumes)
+│   ├── plex.yaml          # Plex service resources
+│   ├── tautulli.yaml      # Tautulli service resources
+│   └── overseerr.yaml     # Overseerr service resources
 └── overlays/               # Environment-specific configs
     ├── minikube/           # For local Minikube testing
     └── microk8s/           # For MicroK8s production (with NFS support)
@@ -252,7 +256,9 @@ kubectl logs -n media deployment/overseerr -f
 
 ### Resource Limits
 
-Edit `app/base/deployment.yaml` to adjust resource allocations:
+Edit the service manifest files in `app/base/` to adjust resource allocations.
+
+For example, to change Plex resources, edit `app/base/plex.yaml`:
 
 ```yaml
 resources:
@@ -266,7 +272,9 @@ resources:
 
 ### Environment Variables
 
-Common environment variables in `deployment.yaml`:
+Common environment variables available in service manifests:
+
+**Plex** (`app/base/plex.yaml`):
 
 - `TZ`: Timezone (default: `UTC`)
 - `ADVERTISE_IP`: Server IP for Plex discovery
