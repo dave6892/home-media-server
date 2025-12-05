@@ -1,6 +1,6 @@
 # Home Media Server
 
-A Kubernetes-based home media server stack featuring Plex Media Server, Tautulli, and Overseerr. This project uses Kustomize for environment-specific configurations and follows GitOps best practices.
+A Kubernetes-based home media server stack featuring Plex Media Server, Tautulli, and Overseerr. This project uses Helm charts for deployment with independent service management and follows GitOps best practices.
 
 ## 📦 What's Included
 
@@ -10,34 +10,53 @@ A Kubernetes-based home media server stack featuring Plex Media Server, Tautulli
 
 ## 🏗️ Architecture
 
-This project uses Kustomize to manage configurations across different Kubernetes environments:
+This project uses a multi-chart Helm architecture where each service is independently deployable:
 
 ```
 app/
-├── base/                    # Base Kubernetes manifests
-│   ├── kustomization.yaml  # Base kustomize config
-│   ├── namespace.yaml      # Namespace definition
-│   ├── storage.yaml        # Shared storage (PersistentVolumes)
-│   ├── plex.yaml          # Plex service resources
-│   ├── tautulli.yaml      # Tautulli service resources
-│   └── overseerr.yaml     # Overseerr service resources
-└── overlays/               # Environment-specific configs
-    ├── minikube/           # For local Minikube testing
-    └── microk8s/           # For MicroK8s production (with NFS support)
+├── shared/              # Shared resources (namespace, storage)
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values-microk8s.yaml
+│   └── templates/
+│       ├── namespace.yaml
+│       └── storage.yaml
+├── plex/                # Plex Media Server chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── values-microk8s.yaml
+│   └── templates/
+│       ├── pvc.yaml
+│       ├── deployment.yaml
+│       └── service.yaml
+├── tautulli/            # Tautulli monitoring chart
+└── overseerr/           # Overseerr requests chart
 ```
 
 ### GitOps Best Practices
 
 Environment-specific values (like NFS server IPs) are kept **outside of version control**:
 - Configuration templates are versioned (`.example` files)
-- Actual values are in `.gitignore`
-- Kustomize injects values at deployment time
+- Actual values in `secrets.yaml` are gitignored
+- Helm loads values from multiple files at deployment time
 
 ## 📋 Prerequisites
 
-Choose one of the following Kubernetes distributions:
+### Required Tools
 
-### Option 1: MicroK8s (Recommended for Production)
+```bash
+# Install Helm
+brew install helm
+
+# Install kubectl
+brew install kubectl
+```
+
+### Kubernetes Distribution
+
+Choose one of the following:
+
+#### Option 1: MicroK8s (Recommended for Production)
 ```bash
 # Install MicroK8s
 sudo snap install microk8s --classic
@@ -46,9 +65,9 @@ sudo snap install microk8s --classic
 microk8s enable dns storage
 ```
 
-### Option 2: Minikube (For Local Testing)
+#### Option 2: Minikube (For Local Testing)
 ```bash
-# macOS with Homebrew
+# Install Minikube
 brew install minikube
 
 # Start Minikube
@@ -56,80 +75,78 @@ minikube start --cpus=4 --memory=8192
 ```
 
 ### Additional Requirements
-- `kubectl` command-line tool
-- NFS server with media storage (for MicroK8s overlay)
-- You may need the plex claim token to claim the media server into your Plex account
+- NFS server with media storage (for MicroK8s production)
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 1. Clone the Repository
+### For Minikube (Development)
 
 ```bash
+# Clone the repository
 git clone https://github.com/dave6892/home-media-server.git
 cd home-media-server
+
+# Deploy everything
+./scripts/deploy.sh minikube
 ```
 
-### 2. Configure Your Environment
+### For MicroK8s (Production)
 
-Choose the overlay that matches your Kubernetes distribution:
-
-#### For MicroK8s (Production with NFS)
-
-1. Create your NFS configuration from the template:
+1. **Create secrets file**:
    ```bash
-   cd app/overlays/microk8s
-   cp nfs.properties.example nfs.properties
+   cp secrets.yaml.example secrets.yaml
    ```
 
-2. Edit `nfs.properties` with your NFS server details:
-   ```properties
-   server=YOUR_SERVER_IP
-   path=YOUR_MOUNTED_NFS_PATH
+2. **Edit `secrets.yaml`** with your NFS server details:
+   ```yaml
+   shared:
+     storage:
+       plexMedia:
+         nfs:
+           server: "192.168.1.142"
+           path: "/mnt/universe7-pool/media"
    ```
 
-#### For Minikube (Local Testing)
+3. **Deploy**:
+   ```bash
+   ./scripts/deploy.sh microk8s
+   ```
 
-No additional configuration needed! The Minikube overlay uses local hostPath storage.
+## 📚 Deployment
 
-### 3. Deploy to Kubernetes
+### Automated Deployment
 
-#### Deploy to MicroK8s
-```bash
-# Preview what will be deployed
-kubectl kustomize app/overlays/microk8s
-
-# Apply the configuration
-kubectl apply -k app/overlays/microk8s
-```
-
-#### Deploy to Minikube
-```bash
-# Preview what will be deployed
-kubectl kustomize app/overlays/minikube
-
-# Apply the configuration
-kubectl apply -k app/overlays/minikube
-```
-
-### 4. Verify Deployment
+Use the provided scripts for easy deployment:
 
 ```bash
-# Check pod status
-kubectl get pods -n media
+# Deploy all services
+./scripts/deploy.sh [minikube|microk8s]
 
-# Check storage
-kubectl get pvc -n media
-
-# Watch pods until they're ready
-kubectl get pods -n media -w
+# Uninstall all services
+./scripts/uninstall.sh
 ```
 
-Expected output:
-```
-NAME                         READY   STATUS    RESTARTS   AGE
-overseerr-xxxxxxxxx-xxxxx    1/1     Running   0          2m
-plex-xxxxxxxxx-xxxxx         1/1     Running   0          2m
-tautulli-xxxxxxxxx-xxxxx     1/1     Running   0          2m
+### Manual Deployment
+
+Deploy services individually:
+
+```bash
+# 1. Deploy shared resources (required first)
+helm upgrade --install media-shared app/shared \
+  -f app/shared/values-microk8s.yaml \
+  -f secrets.yaml
+
+# 2. Deploy Plex
+helm upgrade --install plex app/plex \
+  -f app/plex/values-microk8s.yaml
+
+# 3. Deploy Tautulli
+helm upgrade --install tautulli app/tautulli \
+  -f app/tautulli/values-microk8s.yaml
+
+# 4. Deploy Overseerr
+helm upgrade --install overseerr app/overseerr \
+  -f app/overseerr/values-microk8s.yaml
 ```
 
 ## 🌐 Accessing Your Services
@@ -154,7 +171,7 @@ Access services at:
 - **Tautulli**: http://MINIKUBE_IP:32181
 - **Overseerr**: http://MINIKUBE_IP:32055
 
-#### Alternative: Port Forwarding (Both Environments)
+### Alternative: Port Forwarding
 
 Access services via `localhost`:
 
@@ -169,11 +186,6 @@ kubectl port-forward -n media svc/tautulli 8181:8181
 kubectl port-forward -n media svc/overseerr 5055:5055
 ```
 
-Then access at:
-- **Plex**: http://localhost:32400/web
-- **Tautulli**: http://localhost:8181
-- **Overseerr**: http://localhost:5055
-
 ## 🛠️ Usage
 
 ### Initial Setup
@@ -185,41 +197,26 @@ Then access at:
 
 2. **Configure Tautulli**:
    - Navigate to http://YOUR_IP:32181
-   - Connect to Plex (use `http://plex:32400`)
+   - Connect to Plex (use `http://plex.media.svc.cluster.local:32400`)
 
 3. **Configure Overseerr**:
    - Navigate to http://YOUR_IP:32055
    - Connect to Plex for media discovery and requests
 
-### Managing Media Files
-
-#### MicroK8s (NFS)
-Your media is automatically mounted from your NFS server at the path specified in `nfs.properties`.
-
-#### Minikube (HostPath)
-Add media files to the Minikube VM:
+### Managing Deployments
 
 ```bash
-# SSH into Minikube
-minikube ssh
+# View all releases
+helm list
 
-# Navigate to media directory
-cd /tmp/hostpath-provisioner/plex-media
+# Upgrade a service
+helm upgrade plex app/plex -f app/plex/values-microk8s.yaml
 
-# Copy files (from another terminal)
-minikube cp /path/to/your/media/file.mp4 /tmp/hostpath-provisioner/plex-media/
-```
+# Rollback a service
+helm rollback plex
 
-### Updating the Deployment
-
-After making changes to the manifests:
-
-```bash
-# Preview changes
-kubectl diff -k app/overlays/microk8s
-
-# Apply updates
-kubectl apply -k app/overlays/microk8s
+# Uninstall a service
+helm uninstall plex
 ```
 
 ### Viewing Logs
@@ -235,17 +232,37 @@ kubectl logs -n media deployment/tautulli -f
 kubectl logs -n media deployment/overseerr -f
 ```
 
+### Checking Status
+
+```bash
+# Check pod status
+kubectl get pods -n media
+
+# Check storage
+kubectl get pvc -n media
+
+# Check services
+kubectl get svc -n media
+```
+
 ## 🗂️ Storage Configuration
 
 ### Persistent Volumes
 
 | Volume | Size | Purpose | Access Mode |
 |--------|------|---------|-------------|
-| `plex-config` | 20Gi | Plex configuration and metadata | ReadWriteMany |
-| `plex-media` | 500Gi | Media library (NFS on MicroK8s) | ReadWriteMany |
-| `plex-transcode` | 50Gi | Temporary transcoding files | ReadWriteOnce |
-| `tautulli-config` | 5Gi | Tautulli configuration | ReadWriteOnce |
-| `overseerr-config` | 5Gi | Overseerr configuration | ReadWriteOnce |
+| `plex-config-pv` | 20Gi | Plex configuration and metadata | ReadWriteMany |
+| `plex-media-pv` | 500Gi | Media library (NFS on MicroK8s) | ReadWriteMany |
+
+### Persistent Volume Claims
+
+| Service | PVC | Size | Purpose |
+|---------|-----|------|---------|
+| Plex | `plex-config` | 20Gi | Configuration |
+| Plex | `plex-media` | 500Gi | Media library |
+| Plex | `plex-transcode` | 50Gi | Transcoding temp |
+| Tautulli | `tautulli-config` | 5Gi | Configuration |
+| Overseerr | `overseerr-config` | 5Gi | Configuration |
 
 ### Storage Classes
 
@@ -254,55 +271,51 @@ kubectl logs -n media deployment/overseerr -f
 
 ## 🔧 Customization
 
-### Resource Limits
+### Adjusting Resource Limits
 
-Edit the service manifest files in `app/base/` to adjust resource allocations.
-
-For example, to change Plex resources, edit `app/base/plex.yaml`:
+Edit service values files (e.g., `app/plex/values.yaml`):
 
 ```yaml
 resources:
   requests:
-    memory: "2Gi"
-    cpu: "1000m"
+    memory: "4Gi"
+    cpu: "2000m"
   limits:
-    memory: "8Gi"
-    cpu: "4000m"
+    memory: "16Gi"
+    cpu: "8000m"
+```
+
+Or use `--set` flag:
+```bash
+helm upgrade plex app/plex \
+  --set resources.limits.memory=16Gi \
+  --set resources.limits.cpu=8000m
+```
+
+### Changing Image Versions
+
+```bash
+# Update Plex to specific version
+helm upgrade plex app/plex --set image.tag=1.32.0
+
+# Update via values file
+# Edit app/plex/values.yaml:
+# image:
+#   tag: "1.32.0"
 ```
 
 ### Environment Variables
 
-Common environment variables available in service manifests:
+Common environment variables are configured in each chart's `values.yaml`:
 
-**Plex** (`app/base/plex.yaml`):
-
+**Plex** (`app/plex/values.yaml`):
 - `TZ`: Timezone (default: `UTC`)
 - `ADVERTISE_IP`: Server IP for Plex discovery
 - `PLEX_UID`/`PLEX_GID`: User/Group IDs for file permissions
 
-### Adding New Overlays
-
-Create a new environment configuration:
-
-```bash
-mkdir -p app/overlays/production
-cd app/overlays/production
-
-# Create kustomization.yaml
-cat > kustomization.yaml <<EOF
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-
-resources:
-  - ../../base
-
-# Add your environment-specific patches here
-EOF
-```
-
-## 📚 Additional Documentation
-
-- [Kustomize Setup Guide](docs/KUSTOMIZE.md) - Detailed Kustomize usage and concepts
+**Tautulli/Overseerr**:
+- `TZ`: Timezone
+- `PUID`/`PGID`: User/Group IDs
 
 ## 🐛 Troubleshooting
 
@@ -324,6 +337,9 @@ kubectl get pvc -n media
 
 # Check PV status
 kubectl get pv
+
+# Describe PVC for details
+kubectl describe pvc -n media plex-media
 ```
 
 ### NFS Mount Issues (MicroK8s)
@@ -332,17 +348,37 @@ If Plex pod can't mount NFS:
 1. Verify NFS server is accessible from the Kubernetes node
 2. Check NFS exports: `showmount -e NFS_SERVER_IP`
 3. Ensure proper permissions on NFS share
+4. Verify `secrets.yaml` has correct NFS server and path
 
-### Plex Not Accessible
+### Helm Issues
 
-1. Verify the service is running:
-   ```bash
-   kubectl get svc -n media plex
-   ```
+```bash
+# Lint chart before deploying
+helm lint app/plex
 
-2. Check firewall rules allow port 32400
+# Debug template rendering
+helm template plex app/plex --debug
 
-3. Try using the ADVERTISE_IP environment variable with your server's IP
+# View release history
+helm history plex
+```
+
+## 📖 Documentation
+
+- **[HELM.md](docs/HELM.md)** - Comprehensive Helm deployment guide
+
+## 🏆 Benefits of Helm Architecture
+
+Compared to traditional Kustomize approach:
+
+| Feature | Previous (Kustomize) | Current (Helm) |
+|---------|---------------------|----------------|
+| **Service Management** | All-or-nothing | Independent per service |
+| **Templating** | JSON patches | Go templates |
+| **Rollback** | Manual | `helm rollback` |
+| **Versioning** | Git only | Helm releases + Git |
+| **Customization** | Overlay files | Values files + `--set` |
+| **Package Management** | None | Built-in |
 
 ## 🤝 Contributing
 
@@ -355,7 +391,7 @@ This project is open source and available under the [MIT License](LICENSE).
 ## 🔗 Resources
 
 - [Plex Documentation](https://support.plex.tv/)
-- [Kustomize Documentation](https://kubectl.docs.kubernetes.io/references/kustomize/)
+- [Helm Documentation](https://helm.sh/docs/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [MicroK8s Documentation](https://microk8s.io/docs)
 - [Minikube Documentation](https://minikube.sigs.k8s.io/docs/)

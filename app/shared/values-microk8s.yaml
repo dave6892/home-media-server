@@ -1,0 +1,15 @@
+# Production overrides for MicroK8s environment
+
+storage:
+  storageClass: microk8s-hostpath
+  
+  plexMedia:
+    type: nfs
+    # NFS server and path loaded from secrets.yaml
+    # nfs:
+    #   server: ""
+    #   path: ""
+  
+  plexConfig:
+    type: hostPath
+    hostPath: /var/snap/microk8s/common/default-storage/plex-config

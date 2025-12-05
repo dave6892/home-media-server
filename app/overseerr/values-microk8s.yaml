@@ -1,0 +1,4 @@
+# MicroK8s production overrides
+
+storage:
+  storageClass: microk8s-hostpath

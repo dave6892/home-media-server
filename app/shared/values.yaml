@@ -1,0 +1,23 @@
+# Default values for media-shared chart
+# This is a YAML-formatted file.
+
+namespace: media
+
+storage:
+  storageClass: standard
+  
+  plexMedia:
+    type: hostPath
+    hostPath: /tmp/hostpath-provisioner/plex-media
+    size: 500Gi
+    accessModes:
+      - ReadWriteMany
+    reclaimPolicy: Retain
+  
+  plexConfig:
+    type: hostPath
+    hostPath: /tmp/hostpath-provisioner/plex-config
+    size: 20Gi
+    accessModes:
+      - ReadWriteMany
+    reclaimPolicy: Retain

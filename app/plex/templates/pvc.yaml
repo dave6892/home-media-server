@@ -1,0 +1,46 @@
+---
+# PersistentVolumeClaim for Plex config
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-config
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    {{- toYaml .Values.storage.config.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.storage.storageClass }}
+  volumeName: {{ .Values.storage.config.volumeName }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.config.size }}
+
+---
+# PersistentVolumeClaim for media library
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-media
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    {{- toYaml .Values.storage.media.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.storage.storageClass }}
+  volumeName: {{ .Values.storage.media.volumeName }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.media.size }}
+
+---
+# PersistentVolumeClaim for transcode temp files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-transcode
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes:
+    {{- toYaml .Values.storage.transcode.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.storage.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.transcode.size }}
