@@ -1,0 +1,352 @@
+---
+# Namespace for media services
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: media
+
+---
+# PersistentVolume for Plex media
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: plex-media-pv
+spec:
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /var/snap/microk8s/common/default-storage/plex-media
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: microk8s-hostpath
+
+---
+# PersistentVolume for Plex config
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: plex-config-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: microk8s-hostpath
+  hostPath:
+    path: /var/snap/microk8s/common/default-storage/plex-config
+    type: DirectoryOrCreate
+
+---
+# PersistentVolumeClaim for Plex config
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: microk8s-hostpath
+  volumeName: plex-config-pv
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# PersistentVolumeClaim for media library
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-media
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: microk8s-hostpath
+  volumeName: plex-media-pv
+  resources:
+    requests:
+      storage: 500Gi
+
+---
+# PersistentVolumeClaim for transcode temp files
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-transcode
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: microk8s-hostpath
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Plex Media Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plex
+  namespace: media
+  labels:
+    app: plex
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+      - name: plex
+        image: plexinc/pms-docker:latest
+        ports:
+        - name: plex-web
+          containerPort: 32400
+          protocol: TCP
+        - name: dlna-tcp
+          containerPort: 32469
+          protocol: TCP
+        - name: dlna-udp
+          containerPort: 1900
+          protocol: UDP
+        - name: bonjour-udp
+          containerPort: 5353
+          protocol: UDP
+        - name: roku
+          containerPort: 8324
+          protocol: TCP
+        - name: gdm-1
+          containerPort: 32410
+          protocol: UDP
+        - name: gdm-2
+          containerPort: 32412
+          protocol: UDP
+        - name: gdm-3
+          containerPort: 32413
+          protocol: UDP
+        - name: gdm-4
+          containerPort: 32414
+          protocol: UDP
+        env:
+        - name: TZ
+          value: "UTC"
+        - name: PLEX_CLAIM
+          value: "claim-mxfsmv7oUzr15PdMy5Sx"  # Add your claim token from https://www.plex.tv/claim/
+        - name: ADVERTISE_IP
+          value: ""  # Add your server IP if needed
+        - name: PLEX_UID
+          value: "1000"
+        - name: PLEX_GID
+          value: "1000"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: media
+          mountPath: /media
+        - name: transcode
+          mountPath: /transcode
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+      volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: plex-config
+      - name: media
+        persistentVolumeClaim:
+          claimName: plex-media
+      - name: transcode
+        persistentVolumeClaim:
+          claimName: plex-transcode
+
+---
+# Plex Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: plex
+  namespace: media
+  labels:
+    app: plex
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: plex
+  ports:
+  - name: plex-web
+    port: 32400
+    targetPort: 32400
+    nodePort: 32400
+    protocol: TCP
+
+---
+# Tautulli (Plex monitoring and statistics)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tautulli-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: microk8s-hostpath
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tautulli
+  namespace: media
+  labels:
+    app: tautulli
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tautulli
+  template:
+    metadata:
+      labels:
+        app: tautulli
+    spec:
+      containers:
+      - name: tautulli
+        image: tautulli/tautulli:latest
+        ports:
+        - name: web
+          containerPort: 8181
+        env:
+        - name: TZ
+          value: "UTC"
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: tautulli-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tautulli
+  namespace: media
+  labels:
+    app: tautulli
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: tautulli
+  ports:
+  - name: web
+    port: 8181
+    targetPort: 8181
+    nodePort: 32181
+
+---
+# Overseerr (Media request management)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: overseerr-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: microk8s-hostpath
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: overseerr
+  namespace: media
+  labels:
+    app: overseerr
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: overseerr
+  template:
+    metadata:
+      labels:
+        app: overseerr
+    spec:
+      containers:
+      - name: overseerr
+        image: sctx/overseerr:latest
+        ports:
+        - name: web
+          containerPort: 5055
+        env:
+        - name: TZ
+          value: "UTC"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: overseerr-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: overseerr
+  namespace: media
+  labels:
+    app: overseerr
+spec:
+  type: NodePort
+  externalTrafficPolicy: Local
+  selector:
+    app: overseerr
+  ports:
+  - name: web
+    port: 5055
+    targetPort: 5055
+    nodePort: 32055
