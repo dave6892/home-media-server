@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: airflow-init-db
+  namespace: airflow
+spec:
+  template:
+    metadata:
+      labels:
+        app: airflow-init
+    spec:
+      serviceAccountName: airflow
+      restartPolicy: OnFailure
+      initContainers:
+      # Wait for PostgreSQL to be ready
+      - name: wait-for-postgres
+        image: postgres:15
+        command:
+          - sh
+          - -c
+          - |
+            until pg_isready -h postgres-service -p 5432 -U airflow; do
+              echo "Waiting for PostgreSQL..."
+              sleep 2
+            done
+            echo "PostgreSQL is ready!"
+        envFrom:
+        - secretRef:
+            name: airflow-secrets
+      containers:
+      - name: init-db
+        image: apache/airflow:2.8.1-python3.11
+        command:
+          - bash
+          - -c
+          - |
+            # Initialize the database
+            airflow db migrate
+            
+            # Create admin user (username: admin, password: admin)
+            airflow users create \
+              --username admin \
+              --firstname Admin \
+              --lastname User \
+              --role Admin \
+              --email admin@example.com \
+              --password admin || true
+            
+            echo "Database initialization complete!"
+        envFrom:
+        - configMapRef:
+            name: airflow-config
+        - secretRef:
+            name: airflow-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
