@@ -1,0 +1,45 @@
+---
+# PersistentVolume for Plex media
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: plex-media-pv
+spec:
+  capacity:
+    storage: {{ .Values.storage.plexMedia.size }}
+  accessModes:
+    {{- toYaml .Values.storage.plexMedia.accessModes | nindent 4 }}
+  persistentVolumeReclaimPolicy: {{ .Values.storage.plexMedia.reclaimPolicy }}
+  storageClassName: {{ .Values.storage.storageClass }}
+  {{- if eq .Values.storage.plexMedia.type "nfs" }}
+  nfs:
+    server: {{ .Values.storage.plexMedia.nfs.server | quote }}
+    path: {{ .Values.storage.plexMedia.nfs.path | quote }}
+  {{- else if eq .Values.storage.plexMedia.type "hostPath" }}
+  hostPath:
+    path: {{ .Values.storage.plexMedia.hostPath }}
+    type: DirectoryOrCreate
+  {{- end }}
+
+---
+# PersistentVolume for Plex config
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: plex-config-pv
+spec:
+  capacity:
+    storage: {{ .Values.storage.plexConfig.size }}
+  accessModes:
+    {{- toYaml .Values.storage.plexConfig.accessModes | nindent 4 }}
+  persistentVolumeReclaimPolicy: {{ .Values.storage.plexConfig.reclaimPolicy }}
+  storageClassName: {{ .Values.storage.storageClass }}
+  {{- if eq .Values.storage.plexConfig.type "nfs" }}
+  nfs:
+    server: {{ .Values.storage.plexConfig.nfs.server | quote }}
+    path: {{ .Values.storage.plexConfig.nfs.path | quote }}
+  {{- else if eq .Values.storage.plexConfig.type "hostPath" }}
+  hostPath:
+    path: {{ .Values.storage.plexConfig.hostPath }}
+    type: DirectoryOrCreate
+  {{- end }}

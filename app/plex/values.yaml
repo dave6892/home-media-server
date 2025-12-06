@@ -1,0 +1,44 @@
+# Default values for Plex chart
+
+namespace: media
+
+image:
+  repository: plexinc/pms-docker
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  TZ: "UTC"
+  ADVERTISE_IP: ""
+  PLEX_UID: "1000"
+  PLEX_GID: "1000"
+
+service:
+  type: LoadBalancer
+  port: 32400
+  nodePort: 32400
+
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "8Gi"
+    cpu: "4000m"
+
+storage:
+  storageClass: standard
+  config:
+    size: 20Gi
+    volumeName: plex-config-pv
+    accessModes:
+      - ReadWriteMany
+  media:
+    size: 500Gi
+    volumeName: plex-media-pv
+    accessModes:
+      - ReadWriteMany
+  transcode:
+    size: 50Gi
+    accessModes:
+      - ReadWriteOnce

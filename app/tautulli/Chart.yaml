@@ -1,0 +1,12 @@
+apiVersion: v2
+name: tautulli
+description: Tautulli - Plex monitoring and statistics
+type: application
+version: 1.0.0
+appVersion: latest
+keywords:
+  - plex
+  - monitoring
+  - statistics
+maintainers:
+  - name: dave6892

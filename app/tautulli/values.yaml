@@ -1,0 +1,33 @@
+# Default values for Tautulli chart
+
+namespace: media
+
+image:
+  repository: tautulli/tautulli
+  tag: latest
+  pullPolicy: IfNotPresent
+
+env:
+  TZ: "UTC"
+  PUID: "1000"
+  PGID: "1000"
+
+service:
+  type: NodePort
+  port: 8181
+  nodePort: 32181
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+storage:
+  storageClass: standard
+  config:
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce

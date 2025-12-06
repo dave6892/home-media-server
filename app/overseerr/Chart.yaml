@@ -1,0 +1,12 @@
+apiVersion: v2
+name: overseerr
+description: Overseerr - Media request and discovery management
+type: application
+version: 1.0.0
+appVersion: latest
+keywords:
+  - overseerr
+  - media
+  - requests
+maintainers:
+  - name: dave6892

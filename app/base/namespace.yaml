@@ -1,6 +1,0 @@
----
-# Namespace for media services
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: media
